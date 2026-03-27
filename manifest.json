@@ -1,0 +1,10 @@
+{
+  "id": "iptv",
+  "name": "IPTV",
+  "author": "Me",
+  "description": "Allows you to stream IPTV channels directly to voice channels.",
+  "homepage": "https://github.com/Sharkord/iptv",
+  "logo": "https://i.imgur.com/ozINkq3.jpeg",
+  "sdkVersion": 1,
+  "version": "0.0.1"
+}
