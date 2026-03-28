@@ -6,18 +6,22 @@ import { pathExists } from "./utils";
 
 type TDownloadLogger = Pick<PluginContext, "log" | "error">;
 
-const downloadPaths: Record<string, { ffmpeg: string }> = {
+const downloadPaths: {
+  [key: string]: {
+    ffmpeg: string;
+  };
+} = {
   linux_x64: {
     ffmpeg:
-      "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+      "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-linux-x64.tar.gz",
   },
   linux_arm64: {
     ffmpeg:
-      "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz",
+      "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-linux-arm64.tar.gz",
   },
   win32_x64: {
     ffmpeg:
-      "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+      "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-win64.tar.gz",
   },
 };
 
@@ -75,39 +79,6 @@ const runOrThrow = async (
   }
 };
 
-const getExtractionCommand = (
-  archivePath: string,
-  extractPath: string,
-): { cmd: string[]; label: string } => {
-  if (archivePath.endsWith(".zip")) {
-    if (process.platform === "win32") {
-      return {
-        cmd: [
-          "powershell",
-          "-NoProfile",
-          "-Command",
-          `Expand-Archive -LiteralPath '${archivePath.replace(/'/g, "''")}' -DestinationPath '${extractPath.replace(/'/g, "''")}' -Force`,
-        ],
-        label: "ZIP",
-      };
-    }
-
-    return {
-      cmd: ["unzip", "-o", archivePath, "-d", extractPath],
-      label: "ZIP",
-    };
-  }
-
-  if (archivePath.endsWith(".tar.xz")) {
-    return {
-      cmd: ["tar", "-xJf", archivePath, "-C", extractPath],
-      label: "tar.xz",
-    };
-  }
-
-  throw new Error(`Unsupported archive format: ${archivePath}`);
-};
-
 const extractArchive = async (
   archivePath: string,
   extractPath: string,
@@ -116,13 +87,11 @@ const extractArchive = async (
   await ensureDir(extractPath, logger);
   logger.log(`Extracting archive ${archivePath} to ${extractPath}`);
 
-  const { cmd, label } = getExtractionCommand(archivePath, extractPath);
+  const tarball = await Bun.file(archivePath).bytes();
+  const archive = new Bun.Archive(tarball);
+  const entryCount = await archive.extract(extractPath);
 
-  await runOrThrow(
-    cmd,
-    `Failed to extract ${label} archive: ${archivePath}`,
-    logger,
-  );
+  logger.log(`Extracted ${entryCount} entries from ${archivePath}`);
 };
 
 const downloadFile = async (
@@ -256,13 +225,9 @@ const downloadFFmpeg = async (logger: TDownloadLogger) => {
 
   logger.log(`Downloading FFmpeg for architecture: ${arch} from URL: ${url}`);
 
-  const archiveExtension = url.endsWith(".tar.xz")
-    ? ".tar.xz"
-    : path.extname(new URL(url).pathname);
-  const archivePath = path.join(
-    DOWNLOAD_DIR,
-    `ffmpeg_${arch}${archiveExtension}`,
-  );
+  const urlFilename = path.basename(new URL(url).pathname);
+  const extractedName = urlFilename.replace(/\.tar\.gz$/, "");
+  const archivePath = path.join(DOWNLOAD_DIR, `ffmpeg_${arch}.tar.gz`);
   const extractPath = path.join(DOWNLOAD_DIR, `ffmpeg_extract_${arch}`);
 
   await ensureDir(DOWNLOAD_DIR, logger);
@@ -274,11 +239,13 @@ const downloadFFmpeg = async (logger: TDownloadLogger) => {
 
   await extractArchive(archivePath, extractPath, logger);
 
-  const extractedBinaryPath = await findFileRecursive(extractPath, binaryName);
+  const extractedBinaryPath =
+    (await findFileRecursive(extractPath, extractedName)) ??
+    (await findFileRecursive(extractPath, binaryName));
 
   if (!extractedBinaryPath) {
     throw new Error(
-      `Could not find ${binaryName} in extracted archive: ${archivePath}`,
+      `Could not find ${extractedName} or ${binaryName} in extracted archive: ${archivePath}`,
     );
   }
 
