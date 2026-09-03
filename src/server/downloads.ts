@@ -1,10 +1,10 @@
 import type { PluginContext } from "@sharkord/plugin-sdk";
 import fs from "fs/promises";
 import path from "path";
-import { BIN_DIR, SERVER_DIR, getFfmpegBinaryPath } from "./paths";
+import { getBinDir, getDownloadDir, getFfmpegBinaryPath } from "./paths";
 import { pathExists } from "./utils";
 
-type TDownloadLogger = Pick<PluginContext, "log" | "error">;
+type TDownloadLogger = Pick<PluginContext["logger"], "log" | "error">;
 
 const downloadPaths: {
   [key: string]: {
@@ -24,8 +24,6 @@ const downloadPaths: {
       "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-win64.tar.gz",
   },
 };
-
-const DOWNLOAD_DIR = path.join(SERVER_DIR, "downloads");
 
 const ensureDir = async (dir: string, logger?: TDownloadLogger) => {
   try {
@@ -63,20 +61,6 @@ const findFileRecursive = async (
   }
 
   return null;
-};
-
-const runOrThrow = async (
-  cmd: string[],
-  errorMessage: string,
-  logger: TDownloadLogger,
-): Promise<void> => {
-  const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: "pipe" });
-  const exitCode = await proc.exited;
-
-  if (exitCode !== 0) {
-    logger.error(errorMessage);
-    throw new Error(errorMessage);
-  }
 };
 
 const extractArchive = async (
@@ -185,7 +169,7 @@ const ensureBinaryTargetPath = async (
   binaryPath: string,
   logger: TDownloadLogger,
 ): Promise<void> => {
-  await ensureDir(BIN_DIR, logger);
+  await ensureDir(getBinDir(), logger);
 
   if (!(await pathExists(binaryPath))) {
     return;
@@ -227,10 +211,10 @@ const downloadFFmpeg = async (logger: TDownloadLogger) => {
 
   const urlFilename = path.basename(new URL(url).pathname);
   const extractedName = urlFilename.replace(/\.tar\.gz$/, "");
-  const archivePath = path.join(DOWNLOAD_DIR, `ffmpeg_${arch}.tar.gz`);
-  const extractPath = path.join(DOWNLOAD_DIR, `ffmpeg_extract_${arch}`);
+  const archivePath = path.join(getDownloadDir(), `ffmpeg_${arch}.tar.gz`);
+  const extractPath = path.join(getDownloadDir(), `ffmpeg_extract_${arch}`);
 
-  await ensureDir(DOWNLOAD_DIR, logger);
+  await ensureDir(getDownloadDir(), logger);
   await ensureBinaryTargetPath(binaryPath, logger);
 
   await fs.rm(extractPath, { recursive: true, force: true });
@@ -280,19 +264,20 @@ const areRequiredBinariesPresent = async (): Promise<boolean> => {
   return ffmpegExists;
 };
 
-const ensureRequiredBinaries = async (ctx: PluginContext) => {
-  ctx.log("Ensuring required binaries are available");
+const ensureRequiredBinaries = async (logger: TDownloadLogger) => {
+  logger.log("Ensuring required binaries are available");
 
-  await Promise.all([ensureBinary(getFfmpegBinaryPath(), downloadFFmpeg, ctx)]);
+  await ensureBinary(getFfmpegBinaryPath(), downloadFFmpeg, logger);
 
   try {
-    ctx.log(`Cleaning temporary download directory ${DOWNLOAD_DIR}`);
-    await fs.rm(DOWNLOAD_DIR, { recursive: true, force: true });
+    logger.log(`Cleaning temporary download directory ${getDownloadDir()}`);
+    await fs.rm(getDownloadDir(), { recursive: true, force: true });
   } catch {
     // ignore
   }
 
-  ctx.log("Required binaries are available");
+  logger.log("Required binaries are available");
 };
 
 export { areRequiredBinariesPresent, ensureRequiredBinaries };
+export type { TDownloadLogger };

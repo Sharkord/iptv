@@ -17,11 +17,24 @@ The plugin will automatically download the required dependencies (ffmpeg) on fir
 
 ## Settings
 
-- `playlist`: Paste the contents of your `.m3u` playlist here.
+- `playlistUrl`: The URL of your `.m3u` playlist. Stored write-only, since provider URLs usually carry credentials.
+
+## Channel browser
+
+Admins get a TV button in the top bar. It opens a searchable grid of every channel in the playlist, with the logo each entry declares, and clicking one streams it into the voice channel you are currently in. The grid is gated behind `MANAGE_PLUGINS`; server owners can narrow that further per role.
 
 ## Commands
 
-- `/iptv_play_direct <stream_url> [stream_name]`: Starts streaming a direct IPTV stream URL (not a playlist).
-- `/iptv_play <channel_name>`: Finds the closest matching channel in the playlist and starts streaming it.
-- `/iptv_stop`: Stops the currently active IPTV stream in the channel.
-- `/iptv_clean`: Cleans up the active stream in the current channel.
+- `/iptv_play <channel_name>`: Finds the closest matching channel in the playlist and starts streaming it. Needs `JOIN_VOICE_CHANNELS`.
+- `/iptv_play_direct <stream_url> [stream_name]`: Streams a direct media URL (not a playlist). Needs `MANAGE_PLUGINS`, because it makes the server fetch an arbitrary URL.
+- `/iptv_stop`: Stops the stream in your voice channel. Needs `JOIN_VOICE_CHANNELS`.
+- `/iptv_clean`: Stops every IPTV stream on the server. Needs `MANAGE_PLUGINS`.
+
+## Development
+
+```bash
+bun install
+bun run build        # set SHARKORD_PLUGINS_PATH in .env to deploy on every build
+bun run test
+bun run check-types
+```

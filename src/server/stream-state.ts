@@ -4,12 +4,17 @@ import type {
   Producer,
   TExternalStreamHandle,
 } from "@sharkord/plugin-sdk";
+import fs from "fs/promises";
+import type { StreamSnapshot } from "../contract";
 import { killFFmpegProcesses, type TProcessPair } from "./ffmpeg";
+import { getHlsDir } from "./paths";
 
 type TStreamState = {
   processes: TProcessPair;
   streamActive: boolean;
   streamStarting: boolean;
+  channelName: string | null;
+  channelLogo: string | null;
   videoProducer: Producer | null;
   audioProducer: Producer | null;
   videoTransport: PlainTransport<AppData> | null;
@@ -18,12 +23,32 @@ type TStreamState = {
   isCleaning: boolean;
 };
 
+const IDLE_SNAPSHOT: StreamSnapshot = {
+  streamActive: false,
+  streamStarting: false,
+  channelName: null,
+  channelLogo: null,
+};
+
 const streamStates = new Map<number, TStreamState>();
+
+let notify: (channelId: number, error?: string) => void = () => {};
+
+const setStreamNotifier = (
+  handler: (channelId: number, error?: string) => void,
+): void => {
+  notify = handler;
+};
+
+const publishStreamState = (channelId: number, error?: string): void =>
+  notify(channelId, error);
 
 const createDefaultState = (): TStreamState => ({
   processes: {},
   streamActive: false,
   streamStarting: false,
+  channelName: null,
+  channelLogo: null,
   videoProducer: null,
   audioProducer: null,
   videoTransport: null,
@@ -44,16 +69,28 @@ const getStreamState = (channelId: number): TStreamState => {
   return state;
 };
 
-const getExistingStreamState = (
-  channelId: number,
-): TStreamState | undefined => {
-  return streamStates.get(channelId);
+const getExistingStreamState = (channelId: number): TStreamState | undefined =>
+  streamStates.get(channelId);
+
+const getStreamSnapshot = (channelId: number | undefined): StreamSnapshot => {
+  const state =
+    channelId === undefined ? undefined : streamStates.get(channelId);
+
+  if (!state) return IDLE_SNAPSHOT;
+
+  return {
+    streamActive: state.streamActive,
+    streamStarting: state.streamStarting,
+    channelName: state.channelName,
+    channelLogo: state.channelLogo,
+  };
 };
 
-const cleanupChannel = (channelId: number): void => {
+/** false when there was nothing to tear down, so callers can tell a stop apart */
+const cleanupChannel = (channelId: number, error?: string): boolean => {
   const state = streamStates.get(channelId);
 
-  if (!state || state.isCleaning) return;
+  if (!state || state.isCleaning) return false;
 
   state.isCleaning = true;
 
@@ -62,8 +99,9 @@ const cleanupChannel = (channelId: number): void => {
 
     state.processes = {};
 
-    state.streamHandle?.remove?.();
-    state.streamHandle = null;
+    try {
+      state.streamHandle?.remove();
+    } catch {}
 
     state.videoProducer?.close();
     state.audioProducer?.close();
@@ -74,17 +112,26 @@ const cleanupChannel = (channelId: number): void => {
     state.audioProducer = null;
     state.videoTransport = null;
     state.audioTransport = null;
+    state.streamHandle = null;
 
     state.streamActive = false;
     state.streamStarting = false;
+    state.channelName = null;
+    state.channelLogo = null;
   } finally {
     state.isCleaning = false;
     streamStates.delete(channelId);
   }
+
+  fs.rm(getHlsDir(channelId), { recursive: true, force: true }).catch(() => {});
+
+  notify(channelId, error);
+
+  return true;
 };
 
 const cleanupAll = (): void => {
-  for (const channelId of streamStates.keys()) {
+  for (const channelId of [...streamStates.keys()]) {
     cleanupChannel(channelId);
   }
 };
@@ -93,7 +140,10 @@ export {
   cleanupAll,
   cleanupChannel,
   getExistingStreamState,
+  getStreamSnapshot,
   getStreamState,
+  publishStreamState,
+  setStreamNotifier,
   streamStates,
 };
 
