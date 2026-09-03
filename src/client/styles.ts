@@ -53,6 +53,9 @@ const CSS = `
 .iptv-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 8px; padding: 0 14px 12px; overflow-y: auto; align-content: start;
+  /* min-height overrides a flex item's auto minimum, without which the grid
+     grows to fit every tile and is clipped by the panel instead of scrolling */
+  flex: 1 1 auto; min-height: 0;
 }
 .iptv-grid::-webkit-scrollbar { width: 8px; }
 .iptv-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -61,6 +64,9 @@ const CSS = `
   display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--border);
   border-radius: 8px; background: var(--card); color: inherit; font: inherit; text-align: left;
   cursor: pointer; transition: border-color 0.15s ease, transform 0.1s ease;
+  /* the whole playlist is in the DOM, so the browser is told to skip laying out
+     and painting the tiles that are scrolled out of view */
+  content-visibility: auto; contain-intrinsic-size: auto 132px;
 }
 .iptv-tile:hover:not(:disabled) { border-color: var(--ring); transform: translateY(-1px); }
 .iptv-tile:disabled { opacity: 0.5; cursor: not-allowed; }

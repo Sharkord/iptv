@@ -11,8 +11,6 @@ import type { IptvChannel } from "../contract";
 import { panelStyle } from "./styles";
 import { useIptv } from "./use-iptv";
 
-const MAX_TILES = 256;
-
 type IconProps = { size?: number };
 
 const TvIcon = ({ size = 20 }: IconProps) => (
@@ -34,7 +32,11 @@ type ChannelTileProps = {
   onPlay: (id: number) => void;
 };
 
-const ChannelTile = ({
+// a provider playlist runs to tens of thousands of entries and all of them are
+// on screen, so a keystroke must not re-render every tile
+// ponytail: memo plus content-visibility carries a few thousand tiles; past
+// that the DOM node count itself is the cost and it wants real virtualisation
+const ChannelTile = memo(({
   channel,
   isOnAir,
   disabled,
@@ -72,7 +74,7 @@ const ChannelTile = ({
       ) : null}
     </button>
   );
-};
+});
 
 type PanelProps = {
   controller: ReturnType<typeof useIptv>;
@@ -119,7 +121,6 @@ const ChannelBrowser = ({ controller }: PanelProps) => {
     );
   }, [channels, deferredQuery, group]);
 
-  const visible = matches.slice(0, MAX_TILES);
   const isStarting = stream.streamStarting;
   const isOnAir = stream.streamActive || isStarting;
   const canStartNow = canPlay && !isBusy && !isDisconnected && !isOnAir;
@@ -220,9 +221,9 @@ const ChannelBrowser = ({ controller }: PanelProps) => {
       {error ? <div className="iptv-note iptv-note-error">{error}</div> : null}
       {blockedReason ? <div className="iptv-note">{blockedReason}</div> : null}
 
-      {visible.length > 0 ? (
+      {matches.length > 0 ? (
         <div className="iptv-grid">
-          {visible.map((channel) => (
+          {matches.map((channel) => (
             <ChannelTile
               key={channel.id}
               channel={channel}
@@ -244,12 +245,6 @@ const ChannelBrowser = ({ controller }: PanelProps) => {
         </div>
       )}
 
-      {matches.length > visible.length ? (
-        <div className="iptv-note">
-          Showing the first {visible.length} of {matches.length}. Narrow the
-          filter to see the rest.
-        </div>
-      ) : null}
     </div>
   );
 };

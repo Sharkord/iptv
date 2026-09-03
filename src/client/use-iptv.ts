@@ -109,6 +109,24 @@ const useIptv = () => {
     }
   }, []);
 
+  // stable identities: the grid holds every channel in the playlist, and a new
+  // callback on each keystroke would re-render all of them
+  const play = useCallback(
+    (id: number) => {
+      setError("");
+
+      return run(() => callAction("playChannel", { id }));
+    },
+    [run],
+  );
+
+  const stop = useCallback(
+    () => run(() => callAction("stopStream")),
+    [run],
+  );
+
+  const refresh = useCallback(() => loadChannels(true), [loadChannels]);
+
   return {
     canBrowse,
     canPlay,
@@ -119,13 +137,9 @@ const useIptv = () => {
     isDisconnected: !currentVoiceChannelId,
     isLoading,
     listError,
-    play: (id: number) => {
-      setError("");
-
-      return run(() => callAction("playChannel", { id }));
-    },
-    refresh: () => loadChannels(true),
-    stop: () => run(() => callAction("stopStream")),
+    play,
+    refresh,
+    stop,
     stream,
   };
 };
