@@ -4,7 +4,7 @@ A simple IPTV plugin for Sharkord that allows you to restream IPTV channels to y
 
 ## Screenshots
 
-![ss](https://i.imgur.com/4WALR7e.png)
+![ss](https://i.imgur.com/HGcVKhC.png)
 
 ## Dependencies
 
