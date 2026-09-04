@@ -1,19 +1,17 @@
 import Fuse from "fuse.js";
-import { parse, type Playlist, type PlaylistItem } from "iptv-playlist-parser";
+import { parse, type PlaylistItem } from "iptv-playlist-parser";
+import type { IptvChannel } from "../contract";
 
 type PlaylistCache = {
-  raw: string;
-  parsed: Playlist | null;
+  url: string;
+  items: PlaylistItem[];
   fuse: Fuse<PlaylistItem> | null;
-  error: string | null;
 };
 
-const cache: PlaylistCache = {
-  raw: "",
-  parsed: null,
-  fuse: null,
-  error: null,
-};
+const cache: PlaylistCache = { url: "", items: [], fuse: null };
+
+// a second caller while the first is still fetching gets the same request
+let inFlight: Promise<PlaylistItem[]> | null = null;
 
 const createPlaylistFuse = (items: PlaylistItem[]) =>
   new Fuse(items, {
@@ -28,35 +26,95 @@ const createPlaylistFuse = (items: PlaylistItem[]) =>
     minMatchCharLength: 2,
   });
 
-const loadPlaylist = (rawPlaylist: string): Playlist => {
-  if (rawPlaylist !== cache.raw) {
-    cache.raw = rawPlaylist;
+const assertPlaylistUrl = (value: string): string => {
+  const url = value.trim();
 
-    try {
-      cache.parsed = parse(rawPlaylist);
-      cache.fuse = createPlaylistFuse(cache.parsed.items);
-      cache.error = null;
-    } catch (error) {
-      cache.parsed = null;
-      cache.fuse = null;
-      cache.error = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  if (!cache.parsed) {
+  if (!url) {
     throw new Error(
-      cache.error || "Playlist could not be parsed. Check settings.",
+      "No playlist URL configured. Add one in the plugin settings.",
     );
   }
 
-  return cache.parsed;
+  if (!/^https?:\/\//i.test(url) || !URL.canParse(url)) {
+    throw new Error(
+      "The playlist setting must be an http(s) URL pointing at an .m3u playlist.",
+    );
+  }
+
+  return url;
 };
 
-const findClosestChannel = (query: string): PlaylistItem | null => {
-  if (!cache.parsed || !cache.fuse) return null;
+const fetchPlaylist = async (url: string): Promise<string> => {
+  // some providers answer a bare fetch with a redirect to an error page
+  const response = await fetch(url, {
+    headers: { "user-agent": "Mozilla/5.0" },
+    redirect: "follow",
+  });
 
-  const results = cache.fuse.search(query, { limit: 1 });
-  return results[0]?.item ?? null;
+  if (!response.ok) {
+    throw new Error(
+      `Playlist request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return response.text();
 };
 
-export { loadPlaylist, findClosestChannel };
+const loadPlaylist = async (
+  settingValue: string,
+  options: { refresh?: boolean } = {},
+): Promise<PlaylistItem[]> => {
+  const url = assertPlaylistUrl(settingValue);
+  const isCached = url === cache.url && cache.items.length > 0;
+
+  if (isCached && !options.refresh) return cache.items;
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    const raw = await fetchPlaylist(url);
+    const items = parse(raw).items;
+
+    if (items.length === 0) {
+      throw new Error("The playlist was fetched but holds no channels.");
+    }
+
+    cache.url = url;
+    cache.items = items;
+    cache.fuse = createPlaylistFuse(items);
+
+    return items;
+  })();
+
+  try {
+    return await inFlight;
+  } finally {
+    inFlight = null;
+  }
+};
+
+const invalidatePlaylist = (): void => {
+  cache.url = "";
+  cache.items = [];
+  cache.fuse = null;
+};
+
+const toChannels = (items: PlaylistItem[]): IptvChannel[] =>
+  items.map((item, id) => ({
+    id,
+    name: item.name || item.tvg?.name || `Channel ${id + 1}`,
+    logo: item.tvg?.logo || null,
+    group: item.group?.title || null,
+  }));
+
+const getChannelAt = (id: number): PlaylistItem | undefined => cache.items[id];
+
+const findClosestChannel = (query: string): PlaylistItem | null =>
+  cache.fuse?.search(query, { limit: 1 })[0]?.item ?? null;
+
+export {
+  findClosestChannel,
+  getChannelAt,
+  invalidatePlaylist,
+  loadPlaylist,
+  toChannels,
+};

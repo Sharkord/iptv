@@ -1,13 +1,28 @@
 import path from "path";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
 
-const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
-const BIN_DIR = path.join(SERVER_DIR, "bin");
+let dataDir = "";
 
-const getBinaryPath = (name: string): string => path.join(BIN_DIR, name);
+const setDataDir = (value: string): void => {
+  dataDir = value;
+};
+
+const getBinDir = (): string => path.join(dataDir, "bin");
+
+const getDownloadDir = (): string => path.join(dataDir, "downloads");
+
+const getHlsDir = (channelId: number): string =>
+  path.join(dataDir, "hls", String(channelId));
 
 const getFfmpegBinaryPath = (): string =>
-  getBinaryPath(process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+  path.join(
+    getBinDir(),
+    process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+  );
 
-export { BIN_DIR, SERVER_DIR, getBinaryPath, getFfmpegBinaryPath };
+export {
+  getBinDir,
+  getDownloadDir,
+  getFfmpegBinaryPath,
+  getHlsDir,
+  setDataDir,
+};

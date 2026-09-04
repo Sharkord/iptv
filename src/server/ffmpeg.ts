@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { getFfmpegBinaryPath } from "./paths";
+import { getFfmpegBinaryPath, getHlsDir } from "./paths";
 import { pipeStreamToLogger } from "./utils";
 
 // a lot of vibes going on this file
@@ -12,6 +12,7 @@ type TLogger = {
 };
 
 type TSpawnOptions = {
+  channelId: number;
   sourceUrl: string;
   videoPayloadType: number;
   audioPayloadType: number;
@@ -168,6 +169,7 @@ const prepareHlsDir = async (hlsDir: string): Promise<void> => {
 
 const waitForHls = async (
   playlistPath: string,
+  process: ReturnType<typeof Bun.spawn>,
   minSegments = 4,
   timeout = 30_000,
 ): Promise<void> => {
@@ -184,6 +186,14 @@ const waitForHls = async (
       }
     } catch {
       // File doesn't exist yet — keep waiting
+    }
+
+    // polling the file alone waits out the full timeout when ffmpeg is already
+    // gone, which is every bad source url and every stop during the warmup
+    if (process.exitCode !== null) {
+      throw new Error(
+        `FFmpeg exited with code ${process.exitCode} before the HLS buffer was ready. Check the plugin logs.`,
+      );
     }
 
     await Bun.sleep(500);
@@ -219,16 +229,13 @@ const spawnWithLogging = (
   return proc;
 };
 
-const spawnFFmpeg = async (
-  pluginPath: string,
-  options: TSpawnOptions,
-): Promise<TProcessPair> => {
+const spawnFFmpeg = async (options: TSpawnOptions): Promise<TProcessPair> => {
   const binaryPath = getFfmpegBinaryPath();
   const logger: TLogger = { log: options.log, error: options.error };
 
   logger.log(`Binary path: ${binaryPath}`);
 
-  const hlsDir = path.join(pluginPath, "hls");
+  const hlsDir = getHlsDir(options.channelId);
   const hlsPlaylist = path.join(hlsDir, "stream.m3u8");
 
   await prepareHlsDir(hlsDir);
@@ -239,7 +246,7 @@ const spawnFFmpeg = async (
   const hlsProcess = spawnWithLogging([binaryPath, ...hlsArgs], "HLS", logger);
 
   logger.log("Waiting for HLS playlist...");
-  await waitForHls(hlsPlaylist, 4);
+  await waitForHls(hlsPlaylist, hlsProcess, 4);
   logger.log("HLS playlist ready with buffer!");
 
   logger.log("Starting video RTP stream from HLS...");
