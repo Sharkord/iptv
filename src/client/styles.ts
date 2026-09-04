@@ -6,18 +6,10 @@ const CSS = `
 
 .iptv-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 10px; }
 .iptv-head-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); }
-.iptv-head-count { margin-left: auto; font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
-
-.iptv-icon-btn {
-  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
-  border: 1px solid var(--border); border-radius: 6px; background: transparent;
-  color: var(--muted-foreground); cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+.iptv-head-count {
+  margin-left: auto; display: flex; align-items: center; font-size: 11px;
+  color: var(--muted-foreground); font-variant-numeric: tabular-nums;
 }
-.iptv-icon-btn:hover:not(:disabled) { color: var(--foreground); background: var(--accent); }
-.iptv-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.iptv-spin { animation: iptv-spin 0.9s linear infinite; }
-@keyframes iptv-spin { to { transform: rotate(360deg); } }
 
 .iptv-onair {
   display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center;
@@ -31,24 +23,11 @@ const CSS = `
 .iptv-live { width: 7px; height: 7px; border-radius: 50%; background: var(--destructive); animation: iptv-pulse 1.8s ease-in-out infinite; }
 @keyframes iptv-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-.iptv-stop {
-  height: 28px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px;
-  background: transparent; color: var(--foreground); font: inherit; font-size: 12px; cursor: pointer;
-  transition: background 0.15s ease;
-}
-.iptv-stop:hover:not(:disabled) { background: var(--accent); }
-.iptv-stop:disabled { opacity: 0.4; cursor: not-allowed; }
+.iptv-filters { display: flex; align-items: center; gap: 8px; padding: 0 14px 10px; }
+/* the group name can be long and the trigger is w-fit, so it is capped here */
+.iptv-filters [data-slot="select-trigger"] { max-width: 44%; }
 
-.iptv-filters { display: flex; gap: 8px; padding: 0 14px 10px; }
-.iptv-input, .iptv-select {
-  height: 32px; min-width: 0; border: 1px solid var(--input); border-radius: 6px;
-  background: var(--background); color: var(--foreground); font: inherit; font-size: 12.5px;
-  padding: 0 9px; outline: 0;
-}
-.iptv-input { flex: 1; }
-.iptv-select { flex: none; max-width: 44%; }
-.iptv-input:focus, .iptv-select:focus { border-color: var(--ring); }
-.iptv-input::placeholder { color: var(--muted-foreground); }
+.iptv-alert { padding: 0 14px 10px; }
 
 .iptv-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
@@ -86,7 +65,7 @@ const CSS = `
 .iptv-dot { position: absolute; right: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--destructive); animation: iptv-pulse 1.8s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .iptv-panel *, .iptv-live, .iptv-dot, .iptv-spin { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .iptv-panel *, .iptv-live, .iptv-dot { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 `;
 

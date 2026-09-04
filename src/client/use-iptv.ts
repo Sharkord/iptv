@@ -64,14 +64,16 @@ const useIptv = () => {
   }, []);
 
   useEffect(() => {
-    if (!canBrowse) {
+    // the panel is hidden outside a voice channel, and the whole playlist is a
+    // big payload to hand someone who cannot see it
+    if (!canBrowse || !currentVoiceChannelId) {
       setIsLoading(false);
 
       return;
     }
 
     loadChannels();
-  }, [canBrowse, loadChannels]);
+  }, [canBrowse, currentVoiceChannelId, loadChannels]);
 
   useEffect(() => {
     setError("");
